@@ -34,33 +34,56 @@ export class PostureScorer {
 
   /**
    * Calculate the forward head angle
-   * Measures how much the head is leaning forward relative to the spine
+   * Measures head lean relative to spine orientation (hip-midpoint to shoulder-midpoint)
    * @param landmarks Pose landmarks
    * @returns Angle in degrees (0 = upright, higher = more forward)
    */
   calculateForwardHeadAngle(landmarks: PoseLandmarks): number {
-    // Use shoulder mid-point as reference and nose position
-    const leftShoulder = landmarks[11]; // LEFT_SHOULDER
-    const rightShoulder = landmarks[12]; // RIGHT_SHOULDER
-    const nose = landmarks[0]; // NOSE
+    // Hip mid-point (landmarks[23] LEFT_HIP, landmarks[24] RIGHT_HIP)
+    const leftHip = landmarks[23];
+    const rightHip = landmarks[24];
+    // Shoulder mid-point (landmarks[11] LEFT_SHOULDER, landmarks[12] RIGHT_SHOULDER)
+    const leftShoulder = landmarks[11];
+    const rightShoulder = landmarks[12];
+    // Nose (landmarks[0])
+    const nose = landmarks[0];
 
-    if (!leftShoulder || !rightShoulder || !nose) {
+    if (!leftHip || !rightHip || !leftShoulder || !rightShoulder || !nose) {
       return 0;
     }
 
-    // Calculate shoulder midpoint
+    // Calculate spine vector (hip-midpoint to shoulder-midpoint)
+    const hipMidX = (leftHip.x + rightHip.x) / 2;
+    const hipMidY = (leftHip.y + rightHip.y) / 2;
     const shoulderMidX = (leftShoulder.x + rightShoulder.x) / 2;
     const shoulderMidY = (leftShoulder.y + rightShoulder.y) / 2;
 
-    // Calculate vector from shoulder midpoint to nose
-    const dx = nose.x - shoulderMidX;
-    const dy = nose.y - shoulderMidY;
+    const spineDx = shoulderMidX - hipMidX;
+    const spineDy = shoulderMidY - hipMidY;
 
-    // Calculate angle in degrees (positive = forward lean)
-    const angle = Math.atan2(dy, dx) * (180 / Math.PI);
+    // Calculate head vector (shoulder-midpoint to nose)
+    const headDx = nose.x - shoulderMidX;
+    const headDy = nose.y - shoulderMidY;
+
+    // Calculate angle between spine and head vectors
+    // Dot product: A·B = |A||B|cos(θ)
+    const dotProduct = spineDx * headDx + spineDy * headDy;
+    const spineMagnitude = Math.sqrt(spineDx * spineDx + spineDy * spineDy);
+    const headMagnitude = Math.sqrt(headDx * headDx + headDy * headDy);
+
+    if (spineMagnitude === 0 || headMagnitude === 0) {
+      return 0;
+    }
+
+    const cosAngle = dotProduct / (spineMagnitude * headMagnitude);
+    const angle = Math.acos(Math.max(-1, Math.min(1, cosAngle))) * (180 / Math.PI);
+
+    // Determine if forward (positive) or backward (negative) using cross product
+    const crossProduct = spineDx * headDy - spineDy * headDx;
+    const forwardAngle = crossProduct > 0 ? angle : -angle;
 
     // Normalize to 0-180 range (forward lean is positive)
-    let normalizedAngle = angle + 90; // Adjust so upright is ~0
+    let normalizedAngle = 90 - forwardAngle;
     if (normalizedAngle < 0) normalizedAngle = 0;
     if (normalizedAngle > 180) normalizedAngle = 180;
 

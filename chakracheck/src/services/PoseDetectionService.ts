@@ -1,8 +1,4 @@
-import {
-  PoseLandmarker,
-  PoseLandmarkerResult,
-  createPoseLandmarker,
-} from '@mediapipe/tasks-vision';
+import { FilesetResolver, PoseLandmarker } from '@mediapipe/tasks-vision';
 import { PoseLandmarks } from '../types/mediapipe';
 
 export enum CameraErrorType {
@@ -18,36 +14,50 @@ export class CameraError extends Error {
   }
 }
 
+export interface DetectionCallback {
+  (landmarks: PoseLandmarks | null, timestamp: number): void;
+}
+
 export class PoseDetectionService {
   private landmarker: PoseLandmarker | null = null;
   private videoElement: HTMLVideoElement | null = null;
   private stream: MediaStream | null = null;
   private isRunning = false;
   private animationFrameId: number | null = null;
+  private callback: DetectionCallback | null = null;
 
   /**
    * Initialize the PoseLandmarker with the model file
    * @param modelPath Path to the pose landmarker model file
    */
   async initialize(modelPath: string = '/pose_landmarker_lite.task'): Promise<void> {
-    this.landmarker = await createPoseLandmarker(modelPath, {
+    const visionFileset = await FilesetResolver.forVisionTasks(
+      'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm'
+    );
+    this.landmarker = await PoseLandmarker.createFromOptions(visionFileset, {
       baseOptions: {
         modelAssetPath: modelPath,
-        enableClassification: false,
+        delegate: 'GPU',
       },
       runningMode: 'VIDEO',
+      numPoses: 1,
     });
   }
 
   /**
    * Start pose detection with a video element
    * @param videoElement The video element to process
+   * @param callback Callback to receive pose detections (including null for no pose)
    */
-  async startDetection(videoElement: HTMLVideoElement): Promise<void> {
+  async startDetection(
+    videoElement: HTMLVideoElement,
+    callback: DetectionCallback
+  ): Promise<void> {
     if (!this.landmarker) {
       throw new Error('PoseLandmarker not initialized. Call initialize() first.');
     }
 
+    this.callback = callback;
     this.videoElement = videoElement;
 
     try {
@@ -106,6 +116,8 @@ export class PoseDetectionService {
       this.videoElement.load();
       this.videoElement = null;
     }
+
+    this.callback = null;
   }
 
   /**
@@ -149,6 +161,7 @@ export class PoseDetectionService {
 
   /**
    * Start the detection loop using requestAnimationFrame
+   * Calls processFrame and invokes callback with results (including null for no pose)
    */
   private startDetectionLoop(): void {
     const loop = (timestamp: number) => {
@@ -156,8 +169,10 @@ export class PoseDetectionService {
         return;
       }
 
-      // Process frame (caller can call processFrame as needed)
-      // This loop keeps the video stream active
+      const landmarks = this.processFrame(this.videoElement, timestamp);
+      if (this.callback) {
+        this.callback(landmarks, timestamp);
+      }
 
       this.animationFrameId = requestAnimationFrame(loop);
     };
