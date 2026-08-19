@@ -36,7 +36,7 @@ export class PostureScorer {
    * Calculate the forward head angle
    * Measures head lean relative to spine orientation (hip-midpoint to shoulder-midpoint)
    * @param landmarks Pose landmarks
-   * @returns Angle in degrees (0 = upright, higher = more forward)
+   * @returns Angle in degrees (0 = upright/aligned, increasing = more forward lean)
    */
   calculateForwardHeadAngle(landmarks: PoseLandmarks): number {
     // Hip mid-point (landmarks[23] LEFT_HIP, landmarks[24] RIGHT_HIP)
@@ -65,8 +65,8 @@ export class PostureScorer {
     const headDx = nose.x - shoulderMidX;
     const headDy = nose.y - shoulderMidY;
 
-    // Calculate angle between spine and head vectors
-    // Dot product: A·B = |A||B|cos(θ)
+    // Calculate angle between spine and head vectors using dot product
+    // A·B = |A||B|cos(θ) => θ = acos(A·B / (|A||B|))
     const dotProduct = spineDx * headDx + spineDy * headDy;
     const spineMagnitude = Math.sqrt(spineDx * spineDx + spineDy * spineDy);
     const headMagnitude = Math.sqrt(headDx * headDx + headDy * headDy);
@@ -78,16 +78,8 @@ export class PostureScorer {
     const cosAngle = dotProduct / (spineMagnitude * headMagnitude);
     const angle = Math.acos(Math.max(-1, Math.min(1, cosAngle))) * (180 / Math.PI);
 
-    // Determine if forward (positive) or backward (negative) using cross product
-    const crossProduct = spineDx * headDy - spineDy * headDx;
-    const forwardAngle = crossProduct > 0 ? angle : -angle;
-
-    // Normalize to 0-180 range (forward lean is positive)
-    let normalizedAngle = 90 - forwardAngle;
-    if (normalizedAngle < 0) normalizedAngle = 0;
-    if (normalizedAngle > 180) normalizedAngle = 180;
-
-    return normalizedAngle;
+    // angle is already correct: 0° = upright/aligned, increasing = more forward lean
+    return angle;
   }
 
   /**
@@ -132,7 +124,7 @@ export class PostureScorer {
     const shoulderSymmetry = this.calculateShoulderSymmetry(landmarks);
 
     // Convert forward head angle to score (0-100)
-    // 0 degrees = 100 points, 30 degrees = 0 points
+    // 0 degrees = 100 points (upright), 30 degrees = 0 points (fully leaning forward)
     const forwardHeadScore = Math.max(0, 100 - (forwardHeadAngle * (100 / 30)));
 
     // Weighted combination
