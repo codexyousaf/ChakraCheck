@@ -1,5 +1,5 @@
-import React, { useEffect, useRef, useImperativeHandle, forwardRef } from 'react';
-import { PostureCategory } from '../services/AlertManager';
+import { useEffect, useRef, useImperativeHandle, forwardRef } from 'react';
+import { type PostureCategory } from '../services/AlertManager';
 
 const POSE_CONNECTIONS = [
   [11, 12], // left shoulder to right shoulder

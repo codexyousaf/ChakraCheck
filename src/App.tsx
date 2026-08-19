@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { PoseDetectionService, CameraError, CameraErrorType } from './services/PoseDetectionService';
-import { PostureScorer, PostureState } from './services/PostureScorer';
-import { AlertManager, PostureCategory, UpdateResult } from './services/AlertManager';
-import { VideoCanvas, VideoCanvasHandle } from './components/VideoCanvas';
+import { PostureScorer } from './services/PostureScorer';
+import { AlertManager } from './services/AlertManager';
+import { VideoCanvas } from './components/VideoCanvas';
 import { ScoreDisplay } from './components/ScoreDisplay';
 import { ControlPanel } from './components/ControlPanel';
 import { Alert } from './components/Alert';
@@ -10,7 +10,7 @@ import { Alert } from './components/Alert';
 function App() {
   const [isActive, setIsActive] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
-  const [currentPosture, setCurrentPosture] = useState<PostureState | null>(null);
+  const [currentPosture, setCurrentPosture] = useState<import('./services/PostureScorer').PostureState | null>(null);
   const [alertVisible, setAlertVisible] = useState(false);
   const [landmarks, setLandmarks] = useState<any[] | null>(null);
 
